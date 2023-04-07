@@ -1,0 +1,398 @@
+{
+
+
+  "Charts": [
+    {
+      "Border": null,
+      "ChartId": 73277889,
+      "Position": {
+        "NewSheet": null,
+        "OverlayPosition": {
+          "AnchorCell": {
+            "ColumnIndex": 5,
+            "RowIndex": null,
+            "SheetId": null,
+            "ETag": null
+          },
+          "HeightPixels": 371,
+          "OffsetXPixels": 90,
+          "OffsetYPixels": 15,
+          "WidthPixels": 600,
+          "ETag": null
+        },
+        "SheetId": null,
+        "ETag": null
+      },
+      "Spec": {
+        "AltText": null,
+        "BackgroundColor": null,
+        "BackgroundColorStyle": null,
+        "BasicChart": {
+          "Axis": [
+            {
+              "Format": {
+                "Bold": null,
+                "FontFamily": "Roboto",
+                "FontSize": null,
+                "ForegroundColor": null,
+                "ForegroundColorStyle": null,
+                "Italic": null,
+                "Link": null,
+                "Strikethrough": null,
+                "Underline": null,
+                "ETag": null
+              },
+              "Position": "BOTTOM_AXIS",
+              "Title": "Year",
+              "TitleTextPosition": null,
+              "ViewWindowOptions": {
+                "ViewWindowMax": null,
+                "ViewWindowMin": null,
+                "ViewWindowMode": null,
+                "ETag": null
+              },
+              "ETag": null
+            },
+            {
+              "Format": {
+                "Bold": null,
+                "FontFamily": "Roboto",
+                "FontSize": null,
+                "ForegroundColor": null,
+                "ForegroundColorStyle": null,
+                "Italic": null,
+                "Link": null,
+                "Strikethrough": null,
+                "Underline": null,
+                "ETag": null
+              },
+              "Position": "LEFT_AXIS",
+              "Title": "Value",
+              "TitleTextPosition": null,
+              "ViewWindowOptions": {
+                "ViewWindowMax": null,
+                "ViewWindowMin": null,
+                "ViewWindowMode": null,
+                "ETag": null
+              },
+              "ETag": null
+            }
+          ],
+          "ChartType": "AREA",
+          "CompareMode": null,
+          "Domains": [
+            {
+              "Domain": {
+                "AggregateType": null,
+                "ColumnReference": null,
+                "GroupRule": null,
+                "SourceRange": {
+                  "Sources": [
+                    {
+                      "EndColumnIndex": 1,
+                      "EndRowIndex": 4,
+                      "SheetId": null,
+                      "StartColumnIndex": 0,
+                      "StartRowIndex": 0,
+                      "ETag": null
+                    }
+                  ],
+                  "ETag": null
+                },
+                "ETag": null
+              },
+              "Reversed": null,
+              "ETag": null
+            }
+          ],
+          "HeaderCount": 1,
+          "InterpolateNulls": null,
+          "LegendPosition": null,
+          "LineSmoothing": null,
+          "Series": [
+            {
+              "Color": null,
+              "ColorStyle": null,
+              "DataLabel": {
+                "CustomLabelData": null,
+                "Placement": null,
+                "TextFormat": {
+                  "Bold": null,
+                  "FontFamily": "Roboto",
+                  "FontSize": null,
+                  "ForegroundColor": null,
+                  "ForegroundColorStyle": null,
+                  "Italic": null,
+                  "Link": null,
+                  "Strikethrough": null,
+                  "Underline": null,
+                  "ETag": null
+                },
+                "Type": "NONE",
+                "ETag": null
+              },
+              "LineStyle": null,
+              "PointStyle": null,
+              "Series": {
+                "AggregateType": null,
+                "ColumnReference": null,
+                "GroupRule": null,
+                "SourceRange": {
+                  "Sources": [
+                    {
+                      "EndColumnIndex": 2,
+                      "EndRowIndex": 4,
+                      "SheetId": null,
+                      "StartColumnIndex": 1,
+                      "StartRowIndex": 0,
+                      "ETag": null
+                    }
+                  ],
+                  "ETag": null
+                },
+                "ETag": null
+              },
+              "StyleOverrides": null,
+              "TargetAxis": "LEFT_AXIS",
+              "Type": null,
+              "ETag": null
+            }
+          ],
+          "StackedType": null,
+          "ThreeDimensional": null,
+          "TotalDataLabel": null,
+          "ETag": null
+        },
+        "BubbleChart": null,
+        "CandlestickChart": null,
+        "DataSourceChartProperties": null,
+        "FilterSpecs": null,
+        "FontName": "Roboto",
+        "HiddenDimensionStrategy": "SKIP_HIDDEN_ROWS_AND_COLUMNS",
+        "HistogramChart": null,
+        "Maximized": null,
+        "OrgChart": null,
+        "PieChart": null,
+        "ScorecardChart": null,
+        "SortSpecs": null,
+        "Subtitle": null,
+        "SubtitleTextFormat": null,
+        "SubtitleTextPosition": null,
+        "Title": "Value vs. Year",
+        "TitleTextFormat": {
+          "Bold": null,
+          "FontFamily": "Roboto",
+          "FontSize": null,
+          "ForegroundColor": null,
+          "ForegroundColorStyle": null,
+          "Italic": null,
+          "Link": null,
+          "Strikethrough": null,
+          "Underline": null,
+          "ETag": null
+        },
+        "TitleTextPosition": null,
+        "TreemapChart": null,
+        "WaterfallChart": null,
+        "ETag": null
+      },
+      "ETag": null
+    },
+    {
+      "Border": null,
+      "ChartId": 1,
+      "Position": {
+        "NewSheet": null,
+        "OverlayPosition": {
+          "AnchorCell": {
+            "ColumnIndex": null,
+            "RowIndex": null,
+            "SheetId": null,
+            "ETag": null
+          },
+          "HeightPixels": 300,
+          "OffsetXPixels": 50,
+          "OffsetYPixels": 50,
+          "WidthPixels": 500,
+          "ETag": null
+        },
+        "SheetId": null,
+        "ETag": null
+      },
+      "Spec": {
+        "AltText": null,
+        "BackgroundColor": null,
+        "BackgroundColorStyle": null,
+        "BasicChart": {
+          "Axis": [
+            {
+              "Format": {
+                "Bold": null,
+                "FontFamily": "Roboto",
+                "FontSize": null,
+                "ForegroundColor": null,
+                "ForegroundColorStyle": null,
+                "Italic": null,
+                "Link": null,
+                "Strikethrough": null,
+                "Underline": null,
+                "ETag": null
+              },
+              "Position": "BOTTOM_AXIS",
+              "Title": "Year",
+              "TitleTextPosition": null,
+              "ViewWindowOptions": {
+                "ViewWindowMax": null,
+                "ViewWindowMin": null,
+                "ViewWindowMode": null,
+                "ETag": null
+              },
+              "ETag": null
+            },
+            {
+              "Format": {
+                "Bold": null,
+                "FontFamily": "Roboto",
+                "FontSize": null,
+                "ForegroundColor": null,
+                "ForegroundColorStyle": null,
+                "Italic": null,
+                "Link": null,
+                "Strikethrough": null,
+                "Underline": null,
+                "ETag": null
+              },
+              "Position": "LEFT_AXIS",
+              "Title": "Value",
+              "TitleTextPosition": null,
+              "ViewWindowOptions": {
+                "ViewWindowMax": null,
+                "ViewWindowMin": null,
+                "ViewWindowMode": null,
+                "ETag": null
+              },
+              "ETag": null
+            }
+          ],
+          "ChartType": "AREA",
+          "CompareMode": null,
+          "Domains": [
+            {
+              "Domain": {
+                "AggregateType": null,
+                "ColumnReference": null,
+                "GroupRule": null,
+                "SourceRange": {
+                  "Sources": [
+                    {
+                      "EndColumnIndex": 1,
+                      "EndRowIndex": 4,
+                      "SheetId": null,
+                      "StartColumnIndex": 0,
+                      "StartRowIndex": 0,
+                      "ETag": null
+                    }
+                  ],
+                  "ETag": null
+                },
+                "ETag": null
+              },
+              "Reversed": null,
+              "ETag": null
+            }
+          ],
+          "HeaderCount": 1,
+          "InterpolateNulls": null,
+          "LegendPosition": "BOTTOM_LEGEND",
+          "LineSmoothing": null,
+          "Series": [
+            {
+              "Color": null,
+              "ColorStyle": null,
+              "DataLabel": {
+                "CustomLabelData": null,
+                "Placement": null,
+                "TextFormat": {
+                  "Bold": null,
+                  "FontFamily": "Roboto",
+                  "FontSize": null,
+                  "ForegroundColor": null,
+                  "ForegroundColorStyle": null,
+                  "Italic": null,
+                  "Link": null,
+                  "Strikethrough": null,
+                  "Underline": null,
+                  "ETag": null
+                },
+                "Type": "NONE",
+                "ETag": null
+              },
+              "LineStyle": null,
+              "PointStyle": null,
+              "Series": {
+                "AggregateType": null,
+                "ColumnReference": null,
+                "GroupRule": null,
+                "SourceRange": {
+                  "Sources": [
+                    {
+                      "EndColumnIndex": 2,
+                      "EndRowIndex": 4,
+                      "SheetId": null,
+                      "StartColumnIndex": 1,
+                      "StartRowIndex": 0,
+                      "ETag": null
+                    }
+                  ],
+                  "ETag": null
+                },
+                "ETag": null
+              },
+              "StyleOverrides": null,
+              "TargetAxis": "LEFT_AXIS",
+              "Type": null,
+              "ETag": null
+            }
+          ],
+          "StackedType": null,
+          "ThreeDimensional": null,
+          "TotalDataLabel": null,
+          "ETag": null
+        },
+        "BubbleChart": null,
+        "CandlestickChart": null,
+        "DataSourceChartProperties": null,
+        "FilterSpecs": null,
+        "FontName": "Roboto",
+        "HiddenDimensionStrategy": "SKIP_HIDDEN_ROWS_AND_COLUMNS",
+        "HistogramChart": null,
+        "Maximized": null,
+        "OrgChart": null,
+        "PieChart": null,
+        "ScorecardChart": null,
+        "SortSpecs": null,
+        "Subtitle": null,
+        "SubtitleTextFormat": null,
+        "SubtitleTextPosition": null,
+        "Title": "Sample Chart",
+        "TitleTextFormat": {
+          "Bold": null,
+          "FontFamily": "Roboto",
+          "FontSize": null,
+          "ForegroundColor": null,
+          "ForegroundColorStyle": null,
+          "Italic": null,
+          "Link": null,
+          "Strikethrough": null,
+          "Underline": null,
+          "ETag": null
+        },
+        "TitleTextPosition": null,
+        "TreemapChart": null,
+        "WaterfallChart": null,
+        "ETag": null
+      },
+      "ETag": null
+    }
+  ]
+}

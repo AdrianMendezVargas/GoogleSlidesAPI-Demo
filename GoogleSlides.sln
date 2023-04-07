@@ -5,7 +5,11 @@ VisualStudioVersion = 17.3.32929.385
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GoogleSlides", "GoogleSlides\GoogleSlides.csproj", "{B0C7AE57-21BA-4931-9F8B-9E3EAED5DD84}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GoogleSlide.Test", "GoogleSlide.Test\GoogleSlide.Test.csproj", "{09B21132-C9AA-414D-8BB1-BA821CCAFC5B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GoogleSlide.Test", "GoogleSlide.Test\GoogleSlide.Test.csproj", "{09B21132-C9AA-414D-8BB1-BA821CCAFC5B}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GoogleSlides.Api", "GoogleSlides.Api\GoogleSlides.Api.csproj", "{167A3E4D-9713-4AC7-A712-5BBD4EF58B02}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClassLibrary1", "ClassLibrary1\ClassLibrary1.csproj", "{2A59D570-A047-4C31-A28B-EB017A0B2515}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +25,14 @@ Global
 		{09B21132-C9AA-414D-8BB1-BA821CCAFC5B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{09B21132-C9AA-414D-8BB1-BA821CCAFC5B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{09B21132-C9AA-414D-8BB1-BA821CCAFC5B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{167A3E4D-9713-4AC7-A712-5BBD4EF58B02}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{167A3E4D-9713-4AC7-A712-5BBD4EF58B02}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{167A3E4D-9713-4AC7-A712-5BBD4EF58B02}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{167A3E4D-9713-4AC7-A712-5BBD4EF58B02}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2A59D570-A047-4C31-A28B-EB017A0B2515}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2A59D570-A047-4C31-A28B-EB017A0B2515}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2A59D570-A047-4C31-A28B-EB017A0B2515}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2A59D570-A047-4C31-A28B-EB017A0B2515}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
