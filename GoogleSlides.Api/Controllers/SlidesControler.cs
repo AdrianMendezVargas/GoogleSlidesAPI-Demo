@@ -48,7 +48,7 @@ namespace GoogleSlides.Api.Controllers
             var copyPresentation = new Google.Apis.Drive.v3.Data.File
             {
                 Name = req.PresentationName,
-                Parents = originalPresentation.Parents
+                //Parents =   //new string[] { "1HtwFuFKFe4XJH6IIc8bHKbJZoJ4Tmr8s" }
             };
 
             var copyRequest = _DriveService.Files.Copy(copyPresentation, req.TemplateId);
@@ -68,6 +68,27 @@ namespace GoogleSlides.Api.Controllers
                 request.SendNotificationEmail = true;
                 request.Execute();
 
+                //PermissionsResource.CreateRequest permissionRequest = _DriveService.Permissions.Create(permission, copyPresentationId);
+
+                //// Set the transferOwnership parameter to true
+                //permissionRequest.TransferOwnership = true;
+
+                //// Execute the permission request and transfer ownership of the file
+                //permissionRequest.Execute();
+
+                //// Update the file object to include the new owner
+                //Google.Apis.Drive.v3.Data.File file = new Google.Apis.Drive.v3.Data.File();
+                //file.Owners = new List<User>() { new User() { EmailAddress = req.ReciverEmail } };
+
+                //// Update the file with the new owner
+                //FilesResource.UpdateRequest updateRequest = _DriveService.Files.Update(file, copyPresentationId);
+                //updateRequest.Execute();
+
+                //// Create the permission request and execute it to share the file
+                //var request = _DriveService.Permissions.Create(permission, copyPresentationId);
+                //request.SendNotificationEmail = true;
+                //request.Execute();
+
 
                 var slidesPresentation = _SlidesService.Presentations.Get(copyPresentationId).Execute();
 
@@ -81,17 +102,6 @@ namespace GoogleSlides.Api.Controllers
                 requests.AddRange(GetChartPlaceholdersRequest(req.ChartPlaceholders));
 
                 requests.AddRange(GetRemoveSlidesRequest(req.SlidesToRemove, slidesPresentation));
-
-                //requests.Add(new Request()
-                //{
-                //    ReplaceAllShapesWithSheetsChart = new ReplaceAllShapesWithSheetsChartRequest()
-                //    {
-                //        SpreadsheetId = "1J7sP682rkpLtGiRXcxJVkeCGKhCd8iUNktRomp2iEM0",
-                //        ChartId = 73277889,
-                //        LinkingMode = "LINKED",     // LINKED or NOT_LINKED_IMAGE
-                //        ContainsText = new SubstringMatchCriteria() { MatchCase = true, Text = "{{SALES_CHART}}" }
-                //    }
-                //});
 
                 batchRequest.Requests = requests;
 
@@ -109,7 +119,7 @@ namespace GoogleSlides.Api.Controllers
 
         [HttpGet("TemplateList")]
         [ProducesResponseType(200, Type = typeof(TemplateInfoResponse[]))]
-        public async Task<IActionResult> GetTemplateList()
+        public async Task<IActionResult> GetTemplates()
         {
 
             // Define parameters of request.
@@ -133,6 +143,104 @@ namespace GoogleSlides.Api.Controllers
             return Ok(filesInfo);
 
         }
+
+        [HttpGet("PresentationsList")]
+        [ProducesResponseType(200, Type = typeof(TemplateInfoResponse[]))]
+        public async Task<IActionResult> GetPresentations()
+        {
+
+            // Define parameters of request.
+            FilesResource.ListRequest listRequest = _DriveService.Files.List();
+            listRequest.Q = "mimeType='application/vnd.google-apps.presentation' and not name starts with 'STemplate' and trashed = false";
+            listRequest.Fields = "nextPageToken, files(id, name, createdTime)";
+
+            // List files.
+            IList<Google.Apis.Drive.v3.Data.File> files = listRequest.Execute().Files;
+
+            var filesInfo = new List<object>();
+            foreach (var file in files)
+            {
+                filesInfo.Add(new
+                {
+                    Id = file.Id,
+                    Name = file.Name,
+                    CreatedOn = file.CreatedTime
+                });
+            }
+
+            return Ok(filesInfo);
+
+        }
+
+        [HttpGet("FilesList")]
+        [ProducesResponseType(200, Type = typeof(TemplateInfoResponse[]))]
+        public async Task<IActionResult> GetAllItems()
+        {
+
+            // Define parameters of request.
+            FilesResource.ListRequest listRequest = _DriveService.Files.List();
+            listRequest.Q = "trashed = false";
+            listRequest.Fields = "nextPageToken, files(id, name, createdTime, mimeType)";
+
+            // List files.
+            IList<Google.Apis.Drive.v3.Data.File> files = listRequest.Execute().Files;
+
+            var filesInfo = new List<object>();
+            foreach (var file in files)
+            {
+                filesInfo.Add(new
+                {
+                    Id = file.Id,
+                    Name = file.Name,
+                    CreatedOn = file.CreatedTime,
+                    Type = file.MimeType
+                });
+            }
+
+            return Ok(filesInfo);
+
+        }
+
+        [HttpGet("About")]
+        [ProducesResponseType(200, Type = typeof(object))]
+        public async Task<IActionResult> GetAbout()
+        {
+
+            var aboutReq = _DriveService.About.Get();
+            aboutReq.Fields = "*";
+
+            var about = aboutReq.Execute();
+            return Ok(about);
+
+        }
+
+        [HttpDelete("RemoveAllPresentations")]
+        [ProducesResponseType(200, Type = typeof(TemplateInfoResponse[]))]
+        public async Task<IActionResult> RemoveAllPresentations()
+        {
+
+            // Define parameters of request.
+            FilesResource.ListRequest listRequest = _DriveService.Files.List();
+            listRequest.Q = "mimeType='application/vnd.google-apps.presentation' and not name starts with 'STemplate' and trashed = false";
+            listRequest.Fields = "nextPageToken, files(id, name, createdTime)";
+
+            // List files.
+            IList<Google.Apis.Drive.v3.Data.File> files = listRequest.Execute().Files;
+
+            foreach (var file in files)
+            {
+                // Create a delete request for the file
+                FilesResource.DeleteRequest deleteRequest = _DriveService.Files.Delete(file.Id);
+
+                // Execute the request and delete the file
+                deleteRequest.Execute();
+            }
+            
+
+            return Ok("All presentations removed");
+
+        }
+
 
         [HttpGet("PlaceholdesList/{templateId}")]
         [ProducesResponseType(200, Type = typeof(TemplateInfoResponse[]))]

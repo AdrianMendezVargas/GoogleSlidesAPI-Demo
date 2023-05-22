@@ -1,6 +1,8 @@
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Drive.v3;
 using Google.Apis.Drive.v3.Data;
+using Google.Apis.Gmail.v1;
+using Google.Apis.Gmail.v1.Data;
 using Google.Apis.Services;
 using Google.Apis.Sheets.v4;
 using Google.Apis.Sheets.v4.Data;
@@ -8,8 +10,10 @@ using Google.Apis.Slides.v1;
 using Google.Apis.Slides.v1.Data;
 using Google.Apis.Util.Store;
 using System;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Security;
+using System.Text;
 using Request = Google.Apis.Slides.v1.Data.Request;
 
 namespace GoogleSlide.Test
@@ -17,11 +21,12 @@ namespace GoogleSlide.Test
     [TestClass]
     public class GoogleSlidesTest
     {
-        string[] Scopes = { SlidesService.Scope.Presentations, DriveService.Scope.Drive, SheetsService.Scope.Spreadsheets };
+        string[] Scopes = { SlidesService.Scope.Presentations, DriveService.Scope.Drive, SheetsService.Scope.Spreadsheets, GmailService.Scope.GmailSend };
         UserCredential? Credential;
         DriveService DriveService = null!;
         SlidesService SlidesService = null!;
         SheetsService SheetsService = null!;
+        GmailService GmailService = null!;
 
         [TestInitialize]
         public void InitTest()
@@ -44,6 +49,12 @@ namespace GoogleSlide.Test
             {
                 HttpClientInitializer = Credential,
                 ApplicationName = "Google Sheets Example"
+            });
+
+            GmailService = new GmailService(new BaseClientService.Initializer()
+            {
+                HttpClientInitializer = Credential,
+                ApplicationName = "Gmail API Send Email",
             });
         }
 
@@ -576,10 +587,10 @@ namespace GoogleSlide.Test
                             OffsetYPixels = 50,
                             WidthPixels = 500,
                             HeightPixels = 300,
-                            AnchorCell =  new GridCoordinate() { SheetId = 843514080 }
+                            AnchorCell = new GridCoordinate() { SheetId = 843514080 }
                         }
                     }
-                    
+
                 }
             };
 
@@ -600,50 +611,324 @@ namespace GoogleSlide.Test
         }
 
         [TestMethod]
-        public void AddChartFromTable()
+        public void AddPieChart()
         {
 
-            //// Replace with your desired chart data range
-            //string dataRange = "Sheet1!A1:B10";
+             //This chart uses 2 columns, the first column for categories and the second for the values
+
+            var spreadsheetId = "1J7sP682rkpLtGiRXcxJVkeCGKhCd8iUNktRomp2iEM0";
+
+            // Define the chart specification
+            var chartSpec = new ChartSpec
+            {
+                Title = "My Pie Chart",
+                Subtitle = "Subtitle",
+                PieChart = new PieChartSpec
+                {
+                    /*BOTTOM_LEGEND: displays the legend below the chart.
+                    LEFT_LEGEND: displays the legend on the left side of the chart.
+                    RIGHT_LEGEND: displays the legend on the right side of the chart.
+                    TOP_LEGEND: displays the legend above the chart.
+                    NO_LEGEND: hides the legend from the chart.
+                    LABELED_LEGEND: Use labels for each category*/
+                    LegendPosition = "LABELED_LEGEND",
+                    ThreeDimensional = false,
+                    PieHole = 0.5,
+                    Domain = new ChartData()
+                    {
+                        SourceRange = new ChartSourceRange()
+                        {
+                            Sources = new List<GridRange>()
+                            {
+                                new GridRange()
+                                {
+                                    EndColumnIndex = 1 ,
+                                    EndRowIndex = 4,
+                                    StartColumnIndex = 0,
+                                    StartRowIndex = 0
+                                }
+                            }
+                        },
+                        //AggregateType = "SUM"
+                    },
+                    Series = new ChartData()
+                    {
+                        SourceRange = new ChartSourceRange()
+                        {
+                            Sources = new List<GridRange>()
+                            {
+                                new GridRange()
+                                {
+                                    EndColumnIndex = 2,
+                                    EndRowIndex = 4,
+
+                                    StartColumnIndex = 1,
+                                    StartRowIndex = 0
+                                }
+                            }
+                        }
+                    }
+                }
+            };
 
 
-            //// Create a new spreadsheet
-            //Spreadsheet newSpreadsheet = new Spreadsheet();
-            //newSpreadsheet.Properties = new SpreadsheetProperties();
-            //newSpreadsheet.Properties.Title = "New Spreadsheet";
-            //Spreadsheet createdSpreadsheet = SheetsService.Spreadsheets.Create(newSpreadsheet).Execute();
+            // Create the chart
+            var addChartRequest = new AddChartRequest()
+            {
+                Chart = new EmbeddedChart()
+                {
+                    Spec = chartSpec,
+                    Position = new EmbeddedObjectPosition()
+                    {
+                        OverlayPosition = new OverlayPosition()
+                        {
+                            OffsetXPixels = 50,
+                            OffsetYPixels = 50,
+                            WidthPixels = 500,
+                            HeightPixels = 300,
+                            //AnchorCell = new GridCoordinate() { SheetId = 843514080 }
+                        }
+                    }
 
-            //// Get the ID of the first sheet in the new spreadsheet
-            //int sheetId = createdSpreadsheet.Sheets[0].Properties.SheetId ?? 0;
+                }
+            };
 
-            //// Create the chart data source
-            //DataSource chartDataSource = new DataSource();
-            //chartDataSource.Range = new GridRange { SheetId = sheetId, StartRowIndex = 0, EndRowIndex = 10, StartColumnIndex = 0, EndColumnIndex = 2 };
+            var batchUpdateRequest = new BatchUpdateSpreadsheetRequest()
+            {
+                Requests = new List<Google.Apis.Sheets.v4.Data.Request>()
+                {
+                    new Google.Apis.Sheets.v4.Data.Request()
+                    {
+                        AddChart = addChartRequest,
+                    },
+                },
+            };
 
-            //// Create the chart specifications
-            //ChartSpec chartSpec = new ChartSpec();
-            //chartSpec.Title = "My Chart";
-            //chartSpec.BasicChart = new BasicChart();
-            //chartSpec.BasicChart.ChartType = "COLUMN";
-            //chartSpec.BasicChart.DataSource = chartDataSource;
 
-            //// Create the chart request
-            //AddChartRequest addChartRequest = new AddChartRequest();
-            //addChartRequest.Chart = new EmbeddedChart();
-            //addChartRequest.Chart.Spec = chartSpec;
-            //addChartRequest.TargetSheetId = sheetId;
+            var batchUpdateResponse = SheetsService.Spreadsheets.BatchUpdate(batchUpdateRequest, spreadsheetId).Execute();
 
-            //// Create the batch update request
-            //BatchUpdateSpreadsheetRequest batchUpdateRequest = new BatchUpdateSpreadsheetRequest
-            //{
-            //    Requests = new List<Request> { new Request { AddChart = addChartRequest } }
-            //};
 
-            //// Execute the batch update request
-            //BatchUpdateSpreadsheetResponse batchUpdateResponse = SheetsService.Spreadsheets.BatchUpdate(batchUpdateRequest, createdSpreadsheet.SpreadsheetId).Execute();
+        }
 
-            //Console.WriteLine("Chart created successfully.");
+        [TestMethod]
+        public void AddStackedBarChart()
+        {
 
+            //This chart uses 2 columns, the first column for categories and the second for the values
+
+            var spreadsheetId = "1J7sP682rkpLtGiRXcxJVkeCGKhCd8iUNktRomp2iEM0";
+
+            // Define the chart specification
+            var chartSpec = new ChartSpec
+            {
+                Title = "My stacked Chart",
+                Subtitle = "Subtitle",
+                BasicChart = new BasicChartSpec()
+                {
+                    ChartType = "COLUMN",
+                    HeaderCount = 1,
+                    StackedType = "STACKED",    // PERCENT_STACKED, STACKED, NOT_STACKED
+                    LegendPosition = "BOTTOM_LEGEND",
+                    Axis = new List<BasicChartAxis>()
+                    {
+                        new BasicChartAxis()
+                        {
+                            Position = "BOTTOM_AXIS",
+                            Title = "Year"
+                        },
+                        new BasicChartAxis()
+                        {
+                            Position = "LEFT_AXIS",
+                            Title = "Value"
+                        }
+                    },
+                    Domains = new List<BasicChartDomain>()
+                    {
+                        new BasicChartDomain()
+                        {
+                            Domain = new ChartData()
+                            {
+                                SourceRange = new ChartSourceRange()
+                                {
+                                    Sources = new List<GridRange>()
+                                    {
+                                        new GridRange()
+                                        {
+                                            EndColumnIndex = 1 ,
+                                            EndRowIndex = 4,
+                                            StartColumnIndex = 0,
+                                            StartRowIndex = 0
+                                        }
+                                    }
+                                },
+                                AggregateType = "SUM"
+                            }
+                        }
+                    },
+                    Series = new List<BasicChartSeries>()
+                    {
+                        new BasicChartSeries() {
+                            TargetAxis = "LEFT_AXIS",
+                            Series = new ChartData()
+                            {
+                                SourceRange = new ChartSourceRange()
+                                {
+                                    Sources = new List<GridRange>()
+                                    {
+                                        new GridRange()
+                                        {
+                                            EndColumnIndex = 2,
+                                            EndRowIndex = 4,
+
+                                            StartColumnIndex = 1,
+                                            StartRowIndex = 0
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        new BasicChartSeries() {
+                            TargetAxis = "LEFT_AXIS",
+                            Series = new ChartData()
+                            {
+                                SourceRange = new ChartSourceRange()
+                                {
+                                    Sources = new List<GridRange>()
+                                    {
+                                        new GridRange()
+                                        {
+                                            EndColumnIndex = 3,
+                                            EndRowIndex = 4,
+
+                                            StartColumnIndex = 2,
+                                            StartRowIndex = 0
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+
+            // Create the chart
+            var addChartRequest = new AddChartRequest()
+            {
+                Chart = new EmbeddedChart()
+                {
+                    Spec = chartSpec,
+                    Position = new EmbeddedObjectPosition()
+                    {
+                        OverlayPosition = new OverlayPosition()
+                        {
+                            OffsetXPixels = 50,
+                            OffsetYPixels = 50,
+                            WidthPixels = 500,
+                            HeightPixels = 300,
+                            //AnchorCell = new GridCoordinate() { SheetId = 843514080 }
+                        }
+                    }
+
+                }
+            };
+
+            var batchUpdateRequest = new BatchUpdateSpreadsheetRequest()
+            {
+                Requests = new List<Google.Apis.Sheets.v4.Data.Request>()
+                {
+                    new Google.Apis.Sheets.v4.Data.Request()
+                    {
+                        AddChart = addChartRequest,
+                    },
+                },
+            };
+
+
+            var batchUpdateResponse = SheetsService.Spreadsheets.BatchUpdate(batchUpdateRequest, spreadsheetId).Execute();
+
+
+        }
+
+        [TestMethod]
+        public void AddWaterfallChart()
+        {
+            var spreadsheetId = "1J7sP682rkpLtGiRXcxJVkeCGKhCd8iUNktRomp2iEM0";
+
+            // Define the chart specification
+            var chartSpec = new ChartSpec
+            {
+                Title = "My Waterfall Chart",
+                Subtitle = "Subtitle",
+                WaterfallChart = new WaterfallChartSpec()
+                {
+                    
+                }
+                
+            };
+
+
+            // Create the chart
+            var addChartRequest = new AddChartRequest()
+            {
+                Chart = new EmbeddedChart()
+                {
+                    Spec = chartSpec,
+                    Position = new EmbeddedObjectPosition()
+                    {
+                        OverlayPosition = new OverlayPosition()
+                        {
+                            OffsetXPixels = 50,
+                            OffsetYPixels = 50,
+                            WidthPixels = 500,
+                            HeightPixels = 300,
+                            //AnchorCell = new GridCoordinate() { SheetId = 843514080 }
+                        }
+                    }
+
+                }
+            };
+
+            var batchUpdateRequest = new BatchUpdateSpreadsheetRequest()
+            {
+                Requests = new List<Google.Apis.Sheets.v4.Data.Request>()
+                {
+                    new Google.Apis.Sheets.v4.Data.Request()
+                    {
+                        AddChart = addChartRequest,
+                    },
+                },
+            };
+
+
+            var batchUpdateResponse = SheetsService.Spreadsheets.BatchUpdate(batchUpdateRequest, spreadsheetId).Execute();
+
+        }
+
+        [TestMethod]
+        public void SendMail()
+        {
+            // Create email message.
+            var to = "eladri-@live.com";
+            var subject = "Test email";
+            var body = "This is a test email sent from the Gmail API.";
+            var email = new MimeKit.MimeMessage();
+            email.From.Add(new MimeKit.MailboxAddress("Adrian", "velociraptor088@gmail.com"));
+            email.To.Add(new MimeKit.MailboxAddress(Encoding.UTF8, "eladri", to));
+            email.Subject = subject;
+            email.Body = new MimeKit.TextPart("plain")
+            {
+                Text = body
+            };
+            var rawMessage = Convert.ToBase64String(Encoding.UTF8.GetBytes(email.ToString()));
+            var message = new Message
+            {
+                Raw = rawMessage
+            };
+
+            // Send email message.
+            var sendMessageRequest = GmailService.Users.Messages.Send(message, "me");
+            var response = sendMessageRequest.Execute();
         }
 
         private (string? pageId, Shape shapeId) GetShapeId(string presentationId, string placeholderText)
