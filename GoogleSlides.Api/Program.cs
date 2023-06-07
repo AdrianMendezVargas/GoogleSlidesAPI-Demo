@@ -32,6 +32,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 });
 
 builder.Services.AddScoped<AuthConfigService>();
+builder.Services.AddScoped<TemplateService>();
 
 //builder.Services.AddSingleton<ClientSecrets>(GetClientSecrets());
 
@@ -97,6 +98,8 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
+
+app.UseStaticFiles();
 
 app.MapControllers();
 
