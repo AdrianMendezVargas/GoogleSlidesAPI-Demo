@@ -48,6 +48,10 @@ namespace GoogleSlides.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("BindedTo")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("Editable")
                         .HasColumnType("INTEGER");
 
@@ -61,8 +65,9 @@ namespace GoogleSlides.Api.Migrations
                     b.Property<bool>("Removable")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("SlideId")
-                        .HasColumnType("INTEGER");
+                    b.Property<string>("SlideId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -77,9 +82,8 @@ namespace GoogleSlides.Api.Migrations
 
             modelBuilder.Entity("GoogleSlides.Api.Models.SlideMetadata", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                    b.Property<string>("Id")
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Index")
                         .HasColumnType("INTEGER");

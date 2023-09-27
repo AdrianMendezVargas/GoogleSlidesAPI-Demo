@@ -10,7 +10,7 @@ namespace GoogleSlides.Api.Models
             Placeholders = new List<PlaceholderMetadata>();
         }
 
-        public int Id { get; set; }
+        public string Id { get; set; }
         public int Index { get; set; }
         public bool Removable { get; set; }
         [JsonIgnore]

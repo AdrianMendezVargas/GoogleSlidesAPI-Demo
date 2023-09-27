@@ -22,12 +22,14 @@ namespace GoogleSlides.Api.Data
             modelBuilder.Entity<TemplateMetadata>()
                 .HasMany(t => t.Slides)
                 .WithOne(s => s.Template)
-                .HasForeignKey(s => s.TemplateId);
+                .HasForeignKey(s => s.TemplateId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<SlideMetadata>()
                 .HasMany(s => s.Placeholders)
                 .WithOne(p => p.Slide)
-                .HasForeignKey(p => p.SlideId);
+                .HasForeignKey(p => p.SlideId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
 
 

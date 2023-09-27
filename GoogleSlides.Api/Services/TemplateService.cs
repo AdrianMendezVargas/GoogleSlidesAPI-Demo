@@ -58,7 +58,7 @@ namespace GoogleSlides.Api.Services
 
         public TemplateMetadata? GetTemplateById(string id)
         {
-            return _dbContext.Templates.Include(t => t.Slides)
+            return _dbContext.Templates.Include(t => t.Slides.OrderBy(s => s.Index))
                                       .ThenInclude(s => s.Placeholders)
                                       .FirstOrDefault(t => t.Id == id);
         }

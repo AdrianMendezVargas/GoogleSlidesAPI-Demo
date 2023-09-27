@@ -9,11 +9,13 @@ using Google.Apis.Sheets.v4.Data;
 using Google.Apis.Slides.v1;
 using Google.Apis.Slides.v1.Data;
 using Google.Apis.Util.Store;
+using Org.BouncyCastle.Asn1.Crmf;
 using System;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security;
 using System.Text;
+using System.Xml.Linq;
 using Request = Google.Apis.Slides.v1.Data.Request;
 
 namespace GoogleSlide.Test
@@ -611,10 +613,260 @@ namespace GoogleSlide.Test
         }
 
         [TestMethod]
+        public void CrearSpreadSheet()
+        {
+            string spreadsheetId = "1J7sP682rkpLtGiRXcxJVkeCGKhCd8iUNktRomp2iEM0";
+            string range = "Sheet1!A1:Z";
+
+            // Create the update cells request
+            var updateCellsRequest = new UpdateCellsRequest
+            {
+                Range = new GridRange { SheetId = 0, StartColumnIndex = 0, StartRowIndex = 0, EndColumnIndex = int.MaxValue, EndRowIndex = int.MaxValue },
+                Fields = "userEnteredValue"
+            };
+
+            // Create the batch update request
+            var batchUpdateRequest = new BatchUpdateSpreadsheetRequest
+            {
+                Requests = new List<Google.Apis.Sheets.v4.Data.Request>
+                {
+                    new Google.Apis.Sheets.v4.Data.Request
+                    {
+                        UpdateCells = updateCellsRequest
+                    }
+                }
+            };
+
+            // Execute the batch update request
+            var request = SheetsService.Spreadsheets.BatchUpdate(batchUpdateRequest, spreadsheetId);
+            var response = request.Execute();
+        }
+
+        [TestMethod]
+        public void CloneSlideAndPaste()
+        {
+
+            string sourcePresentationId = "1aWCcKOeWR6EvTB2ldZThn4fZVObbuoHoWfteISWPqxc";
+            string targetPresentationId = "1SPIIB_vW1H_85CGFgQf5e56RBmF_LT1O__INLDckHV4";
+            int sourceSlideIndex = 0; // Index of the source slide (zero-based)
+
+            var sourcePresentation = SlidesService.Presentations.Get(sourcePresentationId).Execute();
+            var sourceSlide = sourcePresentation.Slides[sourceSlideIndex];
+
+            var elementsToCopy = new List<PageElement>();
+
+            foreach (var element in sourceSlide.PageElements)
+            {
+                elementsToCopy.Add(element);
+            }
+
+            var copySlideRequest = new CreateSlideRequest
+            {
+                ObjectId = Guid.NewGuid().ToString()
+            };
+
+            var batchUpdateRequest = new BatchUpdatePresentationRequest
+            {
+                Requests = new List<Request>
+                {
+                    new Request
+                    {
+                        CreateSlide = copySlideRequest
+                    }
+                }
+            };
+
+            var batchUpdateResponse = SlidesService.Presentations.BatchUpdate(batchUpdateRequest, targetPresentationId).Execute();
+
+            string copiedSlideId = batchUpdateResponse.Replies[0].CreateSlide.ObjectId;
+
+            foreach (var element in elementsToCopy)
+            {
+
+                if (element.Image != null)
+                {
+                    var createRequest = new CreateImageRequest
+                    {
+                        ObjectId = Guid.NewGuid().ToString(),
+                        ElementProperties = new PageElementProperties { Transform = element.Transform, Size = element.Size, PageObjectId = copiedSlideId },
+                        Url = element.Image.SourceUrl
+
+                    };
+
+                    var batchUpdateRequest2 = new BatchUpdatePresentationRequest
+                    {
+                        Requests = new List<Request>
+                        {
+                            new Request
+                            {
+                                CreateImage = createRequest
+                            }
+                        }
+                    };
+
+                    SlidesService.Presentations.BatchUpdate(batchUpdateRequest2, targetPresentationId).Execute();
+                }
+                else
+                {
+
+                    var createRequest = new CreateShapeRequest
+                    {
+                        ObjectId = Guid.NewGuid().ToString(),
+                        ShapeType = element.Shape.ShapeType,
+                        ElementProperties = new PageElementProperties { Size = element.Size, Transform = element.Transform, PageObjectId = copiedSlideId },
+
+                    };
+
+                    var batchUpdateRequest2 = new BatchUpdatePresentationRequest
+                    {
+                        Requests = new List<Request>
+                    {
+                        new Request
+                        {
+                            CreateShape = createRequest
+                        }
+                    }
+                    };
+
+                    SlidesService.Presentations.BatchUpdate(batchUpdateRequest2, targetPresentationId).Execute();
+
+                }
+
+
+            }
+
+            var targetPresentation = SlidesService.Presentations.Get(targetPresentationId).Execute();
+
+            IList<PageElement>? pageElements = targetPresentation.Slides.FirstOrDefault(s => s.ObjectId == copiedSlideId)?.PageElements;
+            for (int i = 0; i < pageElements.Count; i++)
+            {
+                PageElement? pageElement = pageElements[i];
+
+                if (pageElement.Shape != null)
+                {
+                    var content = string.Join("", elementsToCopy[i].Shape.Text.TextElements
+                                                    .Where(t => t.TextRun != null)
+                                                    .Select(t => t.TextRun.Content)
+                                             )
+                                        .Replace("\n", "");
+
+
+                    var batchUpdateRequest3 = new BatchUpdatePresentationRequest
+                    {
+                        Requests = new List<Request>
+                        {
+                            new Request
+                            {
+                                InsertText = new InsertTextRequest() { ObjectId = pageElement.ObjectId, Text = content },
+
+
+                            }
+                        }
+                    };
+
+                    SlidesService.Presentations.BatchUpdate(batchUpdateRequest3, targetPresentationId).Execute();
+
+                    var batchUpdateRequest4 = new BatchUpdatePresentationRequest
+                    {
+                        Requests = new List<Request>
+                        {
+                            new Request
+                            {
+
+                                 UpdateShapeProperties = new UpdateShapePropertiesRequest
+                                {
+                                    ObjectId  = pageElement.ObjectId,
+                                    Fields = "shapeBackgroundFill,outline,shadow,link,contentAlignment",
+                                    ShapeProperties = pageElement.Shape.ShapeProperties
+                                }
+                            }
+                        }
+                    };
+
+                    SlidesService.Presentations.BatchUpdate(batchUpdateRequest4, targetPresentationId).Execute();
+                }
+
+
+            }
+
+
+
+        }
+
+        [TestMethod]
+        public void CloneSlideToNewPresentation()
+        {
+            var presentationIdA = "1aWCcKOeWR6EvTB2ldZThn4fZVObbuoHoWfteISWPqxc";
+            var presentationIdB = "1YI_Ht2EhjALZj86t8oPed2O4FXbKukjAZ5-8_EvduKw";
+            var slideId = "g253657358fe_0_1";
+
+            var getRequest = SlidesService.Presentations.Get(presentationIdA);
+            var presentation = getRequest.Execute();
+
+            var slide = presentation.Slides.FirstOrDefault(s => s.ObjectId == slideId);
+
+            if (slide != null)
+            {
+                var batchUpdateRequest = new BatchUpdatePresentationRequest
+                {
+                    Requests = new List<Request>
+                    {
+                        new Request
+                        {
+                            DuplicateObject = new DuplicateObjectRequest
+                            {
+                                ObjectId = slide.ObjectId,
+                                ObjectIds = new Dictionary<string, string>
+                                {
+                                    { slide.ObjectId, Guid.NewGuid().ToString() }
+                                }
+                            }
+                        }
+                    }
+                };
+
+                var batchUpdateResponse = SlidesService.Presentations.BatchUpdate(batchUpdateRequest, presentationIdB).Execute();
+            }
+
+        }
+
+
+        [TestMethod]
+        public void ReorderSlides()
+        {
+            string presentationId = "1CQjIJLn3KbZOy22ZgHaCZiW_R0e0mkaHLGGpz62QyL0";
+            string slideId = "g254835d2201_0_5"; // 
+            int targetIndex = 3; // Índice donde deseas colocar la diapositiva movida
+
+            // Crear la solicitud de actualización de la presentación
+            var request = new UpdateSlidesPositionRequest
+            {
+                SlideObjectIds = new List<string> { slideId },
+                InsertionIndex = targetIndex
+            };
+
+            var batchUpdateRequest = new BatchUpdatePresentationRequest
+            {
+                Requests = new List<Request>
+                {
+                    new Request
+                    {
+                            UpdateSlidesPosition = request
+                    }
+                }
+            };
+
+
+            // Enviar la solicitud a la API de Google Slides
+            var updateRequest = SlidesService.Presentations.BatchUpdate(batchUpdateRequest, presentationId);
+            updateRequest.Execute();
+        }
+
+        [TestMethod]
         public void AddPieChart()
         {
 
-             //This chart uses 2 columns, the first column for categories and the second for the values
+            //This chart uses 2 columns, the first column for categories and the second for the values
 
             var spreadsheetId = "1J7sP682rkpLtGiRXcxJVkeCGKhCd8iUNktRomp2iEM0";
 
@@ -825,7 +1077,7 @@ namespace GoogleSlide.Test
                             OffsetXPixels = 50,
                             OffsetYPixels = 50,
                             WidthPixels = 500,
-                            HeightPixels = 300,
+                            HeightPixels = 350,
                             //AnchorCell = new GridCoordinate() { SheetId = 843514080 }
                         }
                     }
@@ -862,9 +1114,9 @@ namespace GoogleSlide.Test
                 Subtitle = "Subtitle",
                 WaterfallChart = new WaterfallChartSpec()
                 {
-                    
+
                 }
-                
+
             };
 
 
@@ -902,6 +1154,105 @@ namespace GoogleSlide.Test
 
 
             var batchUpdateResponse = SheetsService.Spreadsheets.BatchUpdate(batchUpdateRequest, spreadsheetId).Execute();
+
+        }
+
+        [TestMethod]
+        public void AddImageFullscreen()
+        {
+
+            string presentationId = "1aWCcKOeWR6EvTB2ldZThn4fZVObbuoHoWfteISWPqxc";
+            string imageUrl = "https://googleslidesapi.azurewebsites.net/thumbnails/1yJzb5prVVdWZ4WAfKK6y0tOZ_pn0U8rR8KZ3UGvonfg/LARGE/slide0.png";
+
+
+            var getRequest = SlidesService.Presentations.Get(presentationId);
+            var presentation = getRequest.Execute();
+
+            var createSlideRequest = new CreateSlideRequest
+            {
+                //InsertionIndex = presentation.Slides.Count,
+                SlideLayoutReference = new LayoutReference { PredefinedLayout = "BLANK" }
+            };
+            var createSlideResponse = SlidesService.Presentations.BatchUpdate(new BatchUpdatePresentationRequest
+            {
+                Requests = new List<Request> { new Request { CreateSlide = createSlideRequest } }
+            }, presentationId).Execute();
+
+            // Obtener el ID de la nueva página creada
+            var pageId = createSlideResponse.Replies[0].CreateSlide.ObjectId;
+
+            // Realizar la solicitud para crear el shape en la nueva página
+            SlidesService.Presentations.BatchUpdate(new BatchUpdatePresentationRequest
+            {
+                Requests = new List<Request> {
+                    new Request {
+                        CreateImage = new CreateImageRequest {
+                            Url = imageUrl,
+                            ElementProperties = new PageElementProperties()
+                            {
+                                PageObjectId = pageId,
+                                Transform = new AffineTransform { ScaleX = 1, ScaleY = 1, TranslateX = 0, TranslateY = 0, Unit = "PT" },
+                                Size = new Size
+                                {
+                                    Height = new Dimension { Magnitude = 405.04, Unit = "PT" },
+                                    Width = new Dimension { Magnitude = 719.42, Unit = "PT" }
+                                },
+                            }
+                        }
+                    }
+                }
+            }, presentationId).Execute();
+
+        }
+
+        [TestMethod]
+        public void MakeReadOnly()
+        {
+
+            string presentationId = "1aWCcKOeWR6EvTB2ldZThn4fZVObbuoHoWfteISWPqxc";
+            string slideId = "g1e468af8aa1_0_0";
+            string elementObjectId = Guid.NewGuid().ToString();
+
+            // Create a transparent shape element to cover the existing element
+            var transparentShapeRequest = new CreateShapeRequest
+            {
+                ObjectId = elementObjectId,
+                ShapeType = "TEXT_BOX",
+                ElementProperties = new PageElementProperties
+                {
+                    PageObjectId = slideId,
+                    Size = new Size
+                    {
+                        Height = new Dimension { Magnitude = 405.04, Unit = "PT" },
+                        Width = new Dimension { Magnitude = 719.42, Unit = "PT" }
+                    },
+                    Transform = new AffineTransform
+                    {
+                        ScaleX = 1,
+                        ScaleY = 1,
+                        TranslateX = 0,
+                        TranslateY = 0,
+                        Unit = "PT"
+                    }
+                }
+            };
+
+            // Add the transparent shape request to the update requests
+            var updateRequests = new List<Request>
+            {
+                new Request
+                {
+                    CreateShape = transparentShapeRequest
+                }
+            };
+
+            var batchUpdateRequest = new BatchUpdatePresentationRequest
+            {
+                Requests = updateRequests
+            };
+
+
+            SlidesService.Presentations.BatchUpdate(batchUpdateRequest, presentationId).Execute();
 
         }
 

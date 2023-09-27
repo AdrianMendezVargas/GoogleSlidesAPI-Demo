@@ -10,9 +10,10 @@ namespace GoogleSlides.Api.Models
         public IDictionary<string, string> TextPlaceholders { get; set; }
         public IDictionary<string, string> ImagePlaceholders { get; set; }
         public IDictionary<string, ChartInfo> ChartPlaceholders { get; set; }
-
-        public int[] SlidesToRemove { get; set; }
+        public string[] SlidesToRemove { get; set; }
         public string ReciverEmail { get; set; }
+        public IDictionary<string, string> MarketingSlidesIdsToAdd { get; set; } = null;
+        public IDictionary<string, int> SlidesOrder { get; set; }
 
 
     }
@@ -22,6 +23,7 @@ namespace GoogleSlides.Api.Models
 
         public int Id { get; set; } = 0;
         public string Type { get; set; } = "COLUMN";
+        public string StackedType { get; set; } = "NOT_STACKED";
         public string Title { get; set; } = string.Empty;
         public string Subtitle { get; set; } = string.Empty;
         public string LeftAxisName { get; set; }

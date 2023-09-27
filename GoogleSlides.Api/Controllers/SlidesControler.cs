@@ -15,7 +15,9 @@ using GoogleSlides.Api.Models.Domain;
 using GoogleSlides.Api.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore.Sqlite.Query.Internal;
 using Microsoft.Extensions.FileSystemGlobbing.Internal;
+using Newtonsoft.Json;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
@@ -34,7 +36,12 @@ namespace GoogleSlides.Api.Controllers
         private readonly TemplateService _templateService = null!;
         private readonly IWebHostEnvironment _hostingEnvironment;
 
-        public SlidesControler(DriveService driveService, SlidesService slidesService, SheetsService sheetsService, TemplateService templateService, IWebHostEnvironment hostingEnvironment)
+        public SlidesControler(
+            DriveService driveService, 
+            SlidesService slidesService, 
+            SheetsService sheetsService, 
+            TemplateService templateService, 
+            IWebHostEnvironment hostingEnvironment)
         {
 
             _DriveService = driveService;
@@ -49,6 +56,8 @@ namespace GoogleSlides.Api.Controllers
         [ProducesResponseType(200, Type = typeof(string))]
         public async Task<IActionResult> CreateFromTemplate(CreateSlidesDeckFromTemplate req)
         {
+
+            Console.WriteLine("Objeto Peticion: " + JsonConvert.SerializeObject(req));
 
             var originalPresentation = _DriveService.Files.Get(req.TemplateId).Execute();
 
@@ -75,6 +84,7 @@ namespace GoogleSlides.Api.Controllers
                 request.SendNotificationEmail = true;
                 request.Execute();
 
+                #region Comentario Transferir 
                 //PermissionsResource.CreateRequest permissionRequest = _DriveService.Permissions.Create(permission, copyPresentationId);
 
                 //// Set the transferOwnership parameter to true
@@ -95,7 +105,7 @@ namespace GoogleSlides.Api.Controllers
                 //var request = _DriveService.Permissions.Create(permission, copyPresentationId);
                 //request.SendNotificationEmail = true;
                 //request.Execute();
-
+                #endregion
 
                 var slidesPresentation = _SlidesService.Presentations.Get(copyPresentationId).Execute();
 
@@ -113,9 +123,22 @@ namespace GoogleSlides.Api.Controllers
 
                 requests.AddRange(GetRemoveSlidesRequest(req.SlidesToRemove, slidesPresentation));
 
+                if (req.MarketingSlidesIdsToAdd?.Count > 0)   //El problema esta en que es un dictionary y la claves se sobre escriben
+                {
+                    await AddMarketingSlides(req.MarketingSlidesIdsToAdd , copyPresentationId, req.SlidesOrder);
+                }
+
+                if (req.SlidesOrder.Count > 0)
+                {
+                    await ReorderSlides(req.SlidesOrder, copyPresentationId);
+                }
+
                 batchRequest.Requests = requests;
 
                 var response = await _SlidesService.Presentations.BatchUpdate(batchRequest, copyPresentationId).ExecuteAsync();
+
+
+
             }
             catch (Exception e)
             {
@@ -124,6 +147,220 @@ namespace GoogleSlides.Api.Controllers
             }
 
             return Ok($@"https://docs.google.com/presentation/d/{copyPresentationId}/edit");
+        }
+
+        private async Task ReorderSlides(IDictionary<string, int> slidesOrder, string? copyPresentationId)
+        {
+            var requests = new List<Request>();
+
+            foreach (var sOrder in slidesOrder)
+            {
+                var request = new UpdateSlidesPositionRequest
+                {
+                    SlideObjectIds = new List<string> { sOrder.Key },
+                    InsertionIndex = sOrder.Value
+                };
+
+                requests.Add(new Request() { UpdateSlidesPosition = request});
+            }
+
+            var batchUpdateRequest = new BatchUpdatePresentationRequest
+            {
+                Requests = requests
+            };
+
+            var updateRequest = _SlidesService.Presentations.BatchUpdate(batchUpdateRequest, copyPresentationId);
+            await updateRequest.ExecuteAsync();
+        }
+
+        private async Task AddMarketingSlides(IDictionary<string, string> marketingPresentationIdsToAdd, string copyPresentationId)
+        {
+
+            foreach (var marketingPresentationKeyValue in marketingPresentationIdsToAdd)
+            {
+
+                await AddImageSlide(copyPresentationId, 
+                    $"https://googleslidesapi.azurewebsites.net/thumbnails/{marketingPresentationKeyValue.Value}/LARGE/{marketingPresentationKeyValue.Key}.png",
+                    newSlideId: marketingPresentationKeyValue.Key);
+            }
+            
+        }
+
+        private async Task AddMarketingSlides(IDictionary<string, string> marketingPresentationIdsToAdd, string targerPresentationId, IDictionary<string, int> SlidesOrder) {
+
+            using (var client = new HttpClient())
+            {
+                foreach (var marketingPresentationKeyValue in marketingPresentationIdsToAdd)
+                {
+                    var url = $"https://script.google.com/macros/s/AKfycbzCqVDHp9rXYKHemTzdut0_FuhQP6T4q8SQeI-_b3WO8zXzdXj6mNQemwXpqPpXt_eW/exec?srcId={marketingPresentationKeyValue.Value}&dstId={targerPresentationId}&srcPage={marketingPresentationKeyValue.Key}";
+                    
+                    HttpResponseMessage respuesta = await client.GetAsync(url);
+                    
+                    if (respuesta.IsSuccessStatusCode)
+                    {
+
+                        string newSlideId = await respuesta.Content.ReadAsStringAsync();
+
+                        if (SlidesOrder.ContainsKey(marketingPresentationKeyValue.Key))
+                        {
+                            int slideIndex = SlidesOrder[marketingPresentationKeyValue.Key];
+                            SlidesOrder.Remove(marketingPresentationKeyValue.Key);
+
+                            SlidesOrder.Add(newSlideId, slideIndex);
+                        }
+
+                    }
+                }
+            }
+
+        }
+
+        private async Task AddMarketingSlide(int marketinSlideIndex, string targetPresentationId)
+        {
+
+            string sourcePresentationId = "1aWCcKOeWR6EvTB2ldZThn4fZVObbuoHoWfteISWPqxc";
+            int sourceSlideIndex = marketinSlideIndex; // Index of the source slide (zero-based)
+
+            var sourcePresentation = _SlidesService.Presentations.Get(sourcePresentationId).Execute();
+            var sourceSlide = sourcePresentation.Slides[sourceSlideIndex];
+
+            var elementsToCopy = new List<PageElement>();
+
+            foreach (var element in sourceSlide.PageElements)
+            {
+                elementsToCopy.Add(element);
+            }
+
+            var copySlideRequest = new CreateSlideRequest
+            {
+                ObjectId = Guid.NewGuid().ToString()
+            };
+
+            var batchUpdateRequest = new BatchUpdatePresentationRequest
+            {
+                Requests = new List<Request>
+                {
+                    new Request
+                    {
+                        CreateSlide = copySlideRequest
+                    }
+                }
+            };
+
+            var batchUpdateResponse = _SlidesService.Presentations.BatchUpdate(batchUpdateRequest, targetPresentationId).Execute();
+
+            string copiedSlideId = batchUpdateResponse.Replies[0].CreateSlide.ObjectId;
+
+            foreach (var element in elementsToCopy)
+            {
+
+                if (element.Image != null)
+                {
+                    var createRequest = new CreateImageRequest
+                    {
+                        ObjectId = Guid.NewGuid().ToString(),
+                        ElementProperties = new PageElementProperties { Transform = element.Transform, Size = element.Size, PageObjectId = copiedSlideId },
+                        Url = element.Image.SourceUrl
+
+                    };
+
+                    var batchUpdateRequest2 = new BatchUpdatePresentationRequest
+                    {
+                        Requests = new List<Request>
+                        {
+                            new Request
+                            {
+                                CreateImage = createRequest
+                            }
+                        }
+                    };
+
+                    _SlidesService.Presentations.BatchUpdate(batchUpdateRequest2, targetPresentationId).Execute();
+                }
+                else
+                {
+
+                    var createRequest = new CreateShapeRequest
+                    {
+                        ObjectId = Guid.NewGuid().ToString(),
+                        ShapeType = element.Shape.ShapeType,
+                        ElementProperties = new PageElementProperties { Size = element.Size, Transform = element.Transform, PageObjectId = copiedSlideId },
+
+                    };
+
+                    var batchUpdateRequest2 = new BatchUpdatePresentationRequest
+                    {
+                        Requests = new List<Request>
+                    {
+                        new Request
+                        {
+                            CreateShape = createRequest
+                        }
+                    }
+                    };
+
+                    _SlidesService.Presentations.BatchUpdate(batchUpdateRequest2, targetPresentationId).Execute();
+
+                }
+
+
+            }
+
+            var targetPresentation = _SlidesService.Presentations.Get(targetPresentationId).Execute();
+
+            IList<PageElement>? pageElements = targetPresentation.Slides.FirstOrDefault(s => s.ObjectId == copiedSlideId)?.PageElements;
+            for (int i = 0; i < pageElements.Count; i++)
+            {
+                PageElement? pageElement = pageElements[i];
+
+                if (pageElement.Shape != null)
+                {
+                    var content = string.Join("", elementsToCopy[i].Shape.Text.TextElements
+                                                    .Where(t => t.TextRun != null)
+                                                    .Select(t => t.TextRun.Content)
+                                             )
+                                        .Replace("\n", "");
+
+
+                    var batchUpdateRequest3 = new BatchUpdatePresentationRequest
+                    {
+                        Requests = new List<Request>
+                        {
+                            new Request
+                            {
+                                InsertText = new InsertTextRequest() { ObjectId = pageElement.ObjectId, Text = content },
+
+
+                            }
+                        }
+                    };
+
+                    _SlidesService.Presentations.BatchUpdate(batchUpdateRequest3, targetPresentationId).Execute();
+
+                    var batchUpdateRequest4 = new BatchUpdatePresentationRequest
+                    {
+                        Requests = new List<Request>
+                        {
+                            new Request
+                            {
+
+                                 UpdateShapeProperties = new UpdateShapePropertiesRequest
+                                {
+                                    ObjectId  = pageElement.ObjectId,
+                                    Fields = "shapeBackgroundFill,outline,shadow,link,contentAlignment",
+                                    ShapeProperties = pageElement.Shape.ShapeProperties
+                                }
+                            }
+                        }
+                    };
+
+                    _SlidesService.Presentations.BatchUpdate(batchUpdateRequest4, targetPresentationId).Execute();
+                }
+
+
+            }
+
+
         }
 
 
@@ -251,6 +488,15 @@ namespace GoogleSlides.Api.Controllers
 
         }
 
+        [HttpDelete("Remove/{fileId}")]
+        [ProducesResponseType(200, Type = typeof(TemplateInfoResponse[]))]
+        public async Task<IActionResult> RemovePresentationById(string fileId)
+        {
+            _DriveService.Files.Delete(fileId).Execute();
+
+            return Ok("File Deleted");
+        }
+
 
         [HttpGet("PlaceholdesList/{templateId}")]
         [ProducesResponseType(200, Type = typeof(TemplateInfoResponse[]))]
@@ -326,54 +572,55 @@ namespace GoogleSlides.Api.Controllers
             for (int i = 0; i < presentation.Slides.Count; i++)
             {
                 Page? slide = presentation.Slides[i];
-                if (slide.PageElements == null)
-                {
-                    continue;
-                }
 
                 var slideMetadata = new SlideMetadata();
+                slideMetadata.Id = slide.ObjectId;
                 slideMetadata.Index = i;
                 slideMetadata.Removable = true;
 
-                foreach (var element in slide.PageElements)
+                if (slide.PageElements != null)
                 {
-                    var placeholderMetadata = new PlaceholderMetadata();
 
-                    if (element?.Shape?.Text?.TextElements != null)
+                    foreach (var element in slide.PageElements)
                     {
+                        var placeholderMetadata = new PlaceholderMetadata();
 
-                        var content = string.Join("", element.Shape.Text.TextElements
-                                                        .Where(t => t.TextRun != null)
-                                                        .Select(t => t.TextRun.Content)
-                                                 )
-                                            .Replace("\n", "");
-
-                        var matchResult = Regex.Match(content, placeholderPattern);
-
-                        if (matchResult.Success)
+                        if (element?.Shape?.Text?.TextElements != null)
                         {
 
-                            placeholderMetadata.Name = RemoveMetadataText(content);
+                            var content = string.Join("", element.Shape.Text.TextElements
+                                                            .Where(t => t.TextRun != null)
+                                                            .Select(t => t.TextRun.Content)
+                                                     )
+                                                .Replace("\n", "");
 
-                            if (content.Contains("IMAGE"))
-                                placeholderMetadata.Type = "IMAGE";
+                            var matchResult = Regex.Match(content, placeholderPattern);
 
-                            else if (content.Contains("CHART"))
-                                placeholderMetadata.Type = "CHART";
+                            if (matchResult.Success)
+                            {
 
-                            else
-                                placeholderMetadata.Type = "TEXT";
+                                placeholderMetadata.Name = RemoveMetadataText(content);
 
-                            placeholderMetadata.MaxLength = ExtractNumberFromMax(content);
-                            placeholderMetadata.Editable = content.Contains("EDITABLE");
-                            placeholderMetadata.Removable = content.Contains("REMOVABLE");
+                                if (content.Contains("IMAGE"))
+                                    placeholderMetadata.Type = "IMAGE";
 
-                            slideMetadata.Placeholders.Add(placeholderMetadata);
+                                else if (content.Contains("CHART"))
+                                    placeholderMetadata.Type = "CHART";
+
+                                else
+                                    placeholderMetadata.Type = "TEXT";
+
+                                placeholderMetadata.MaxLength = ExtractNumberFromMax(content);
+                                placeholderMetadata.Editable = content.Contains("EDITABLE");
+                                placeholderMetadata.Removable = content.Contains("REMOVABLE");
+
+                                slideMetadata.Placeholders.Add(placeholderMetadata);
+                            }
+
                         }
-
                     }
-                }
 
+                }
 
                 templateMetadata.Slides.Add(slideMetadata);
 
@@ -385,16 +632,44 @@ namespace GoogleSlides.Api.Controllers
 
         }
 
-        [HttpGet("Thumbnails{presentationId}")]
-        public async Task<ActionResult<IEnumerable<string>>> GetSlideThumbnails(string presentationId)
+        [HttpGet("Thumbnails/Generate/{presentationId}/{size?}")]
+        public async Task<ActionResult<IEnumerable<string>>> GenerateSlideThumbnails(string presentationId, string size = "MEDIUM")
         {
+            if (!new string[] {"SMALL", "MEDIUM", "LARGE"}.Contains(size))
+            {
+                return BadRequest("Invalid size. Use SMALL, MEDIUM or LARGE");
+            }
+
             // Get the presentation
             var presentation = _SlidesService.Presentations.Get(presentationId).Execute();
 
             var thumbnailUrls = new List<string>();
 
             // Create a directory path for the thumbnails
+
             var thumbnailsFolderPath = Path.Combine(_hostingEnvironment.WebRootPath, "thumbnails", presentationId);
+
+            var thumbnailSize = PresentationsResource.PagesResource.GetThumbnailRequest.ThumbnailPropertiesThumbnailSizeEnum.MEDIUM;
+
+            if (!string.IsNullOrWhiteSpace(size))
+                thumbnailsFolderPath = Path.Combine(thumbnailsFolderPath, size);
+
+
+            switch (size)
+            {
+                case "SMALL":
+                    thumbnailSize = PresentationsResource.PagesResource.GetThumbnailRequest.ThumbnailPropertiesThumbnailSizeEnum.SMALL;
+                    break;
+
+                case "MEDIUM":
+                    thumbnailSize = PresentationsResource.PagesResource.GetThumbnailRequest.ThumbnailPropertiesThumbnailSizeEnum.MEDIUM;
+                    break;
+
+                case "LARGE":
+                    thumbnailSize = PresentationsResource.PagesResource.GetThumbnailRequest.ThumbnailPropertiesThumbnailSizeEnum.LARGE;
+                    break;
+            }
+
 
             // Create the directory if it doesn't exist
             Directory.CreateDirectory(thumbnailsFolderPath);
@@ -409,14 +684,16 @@ namespace GoogleSlides.Api.Controllers
                     // Create a thumbnail request
                     var thumbnailRequest = _SlidesService.Presentations.Pages.GetThumbnail(presentationId, slide.ObjectId);
                     thumbnailRequest.ThumbnailPropertiesMimeType = PresentationsResource.PagesResource.GetThumbnailRequest.ThumbnailPropertiesMimeTypeEnum.PNG;
-                    thumbnailRequest.ThumbnailPropertiesThumbnailSize = PresentationsResource.PagesResource.GetThumbnailRequest.ThumbnailPropertiesThumbnailSizeEnum.SMALL;
+                    thumbnailRequest.ThumbnailPropertiesThumbnailSize = thumbnailSize;
+
+                    //TODO: Try to create a batch of request for getting the thumbnails
 
                     // Execute the request and get the thumbnail image URL
                     var thumbnailResponse = await thumbnailRequest.ExecuteAsync();
                     var thumbnailUrl = thumbnailResponse.ContentUrl;
 
                     // Generate a unique filename for the thumbnail
-                    var thumbnailFilename = $"slide{i}.png";
+                    var thumbnailFilename = $"{slide.ObjectId}.png";
                     var thumbnailFilePath = Path.Combine(thumbnailsFolderPath, thumbnailFilename);
 
                     // Download the thumbnail image using HttpClient
@@ -433,13 +710,199 @@ namespace GoogleSlides.Api.Controllers
                     }
 
                     // Add the thumbnail file path to the list
-                    var thumbnailUrlPath = $"/thumbnails/{presentationId}/{thumbnailFilename}";
+                    var thumbnailUrlPath = $"/thumbnails/{presentationId}/{size}/{thumbnailFilename}";
                     thumbnailUrls.Add(thumbnailUrlPath);
                 }
             }
 
             return Ok(thumbnailUrls);
         }
+
+        [HttpGet("Thumbnails/Get/{presentationId}")]
+        public async Task<ActionResult<IEnumerable<string>>> GetSlideThumbnails(string presentationId)
+        {
+            var thumbnailsFolderPath = Path.Combine(_hostingEnvironment.WebRootPath, "thumbnails", presentationId);
+
+            if (!Directory.Exists(thumbnailsFolderPath))
+            {
+                return NotFound();
+            }
+
+            var thumbnailUrls = new List<string>();
+            var thumbnailFiles = Directory.GetFiles(thumbnailsFolderPath);
+
+            foreach (var thumbnailFile in thumbnailFiles)
+            {
+                var thumbnailUrl = Path.GetFileName(thumbnailFile);
+                thumbnailUrls.Add(thumbnailUrl);
+            }
+
+            return Ok(thumbnailUrls);
+        }
+
+        [HttpGet("folder/{folderId}")]
+        public async Task<IActionResult> GetMarketingFolders(string folderId)
+        {
+            return Ok(await GetFolderWithSubfolders(folderId));
+        }
+
+        private async Task<FolderMetadata> GetFolderWithSubfolders(string folderId)
+        {
+            FolderMetadata folderMetadata = new FolderMetadata();
+
+            // Create the request to retrieve the files and folders within the specified folder
+            FilesResource.ListRequest request = _DriveService.Files.List();
+            request.Q = $"'{folderId}' in parents and mimeType = 'application/vnd.google-apps.folder'";
+            request.Fields = "files(id, name)";
+            request.PageSize = 1000; // Adjust the page size as needed
+
+            do
+            {
+                // Retrieve the files and folders
+                FileList fileList = await request.ExecuteAsync();
+
+                foreach (Google.Apis.Drive.v3.Data.File folder in fileList.Files)
+                {
+                    FolderMetadata subfolder = new FolderMetadata
+                    {
+                        Id = folder.Id,
+                        Name = folder.Name
+                    };
+
+                    await GetAllSlidesInFolder(subfolder);
+                    // Recursively get subfolders
+                    subfolder.Subfolders = await GetSubfolders(folder.Id);
+
+                    folderMetadata.Subfolders.Add(subfolder);
+                }
+
+                request.PageToken = fileList.NextPageToken;
+            }
+            while (!string.IsNullOrEmpty(request.PageToken));
+
+            
+
+            return folderMetadata;
+        }
+
+        private async Task<List<FolderMetadata>> GetSubfolders(string parentFolderId)
+        {
+            List<FolderMetadata> subfolders = new List<FolderMetadata>();
+
+            FilesResource.ListRequest request = _DriveService.Files.List();
+            request.Q = $"'{parentFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder'";
+            request.Fields = "files(id, name)";
+            request.PageSize = 1000; // Adjust the page size as needed
+
+            do
+            {
+                FileList fileList = request.Execute();
+
+                foreach (Google.Apis.Drive.v3.Data.File folder in fileList.Files)
+                {
+                    FolderMetadata subfolder = new FolderMetadata
+                    {
+                        Id = folder.Id,
+                        Name = folder.Name
+                    };
+
+                    await GetGooglePresentationsInFolder(subfolder);
+                    // Recursively get subfolders
+                    subfolder.Subfolders = await GetSubfolders(folder.Id);
+
+                    subfolders.Add(subfolder);
+                }
+
+                request.PageToken = fileList.NextPageToken;
+            }
+            while (!string.IsNullOrEmpty(request.PageToken));
+
+            return subfolders;
+        }
+
+
+        private async Task GetGooglePresentationsInFolder(FolderMetadata folder)
+        {
+            var request = _DriveService.Files.List();
+            request.Q = $"'{folder.Id}' in parents and mimeType = 'application/vnd.google-apps.presentation'";
+            request.Fields = "files(*)";
+            var response = request.Execute();
+            var presentations = response.Files;
+
+            foreach (var presentation in presentations)
+            {
+                var slidePresentation = await _SlidesService.Presentations.Get(presentation.Id).ExecuteAsync();
+
+                for (int i = 0; i < slidePresentation.Slides.Count; i++)
+                {
+                    Page? slide = slidePresentation.Slides[i];
+                    var slideItem = new FolderMetadata.SlideItem
+                    {
+                        SlideId = slide.ObjectId,
+                        PresentationId = presentation.Id,
+                        PresentationName = presentation.Name,
+                        Name = GetSlideTitle(slidePresentation, slide.ObjectId) ?? "No title",
+                        ThumbnailUrl = $"/thumbnails/{presentation.Id}/MEDIUM/{slide.ObjectId}.png"
+                    };
+                    folder.SlideItems.Add(slideItem);
+                }
+            }
+        }
+
+        private async Task GetAllSlidesInFolder(FolderMetadata folder)
+        {
+            var request = _DriveService.Files.List();
+            request.Q = $"'{folder.Id}' in parents and mimeType = 'application/vnd.google-apps.presentation'";
+            request.Fields = "files(*)";
+            var response = request.Execute();
+            var presentations = response.Files;
+
+            foreach (var presentation in presentations)
+            {
+
+                var slidePresentation = await _SlidesService.Presentations.Get(presentation.Id).ExecuteAsync();
+
+                for (int i = 0; i < slidePresentation.Slides.Count; i++)
+                {
+                    Page? slide = slidePresentation.Slides[i];
+                    var slideItem = new FolderMetadata.SlideItem
+                    {
+                        SlideId = slide.ObjectId,
+                        PresentationId = presentation.Id,
+                        PresentationName = presentation.Name,
+                        Name = GetSlideTitle(slidePresentation, slide.ObjectId) ?? "No title",
+                        ThumbnailUrl = $"/thumbnails/{presentation.Id}/MEDIUM/{slide.ObjectId}.png"
+                    };
+                    folder.SlideItems.Add(slideItem);
+                }
+                
+            }
+        }
+
+
+        private string? GetSlideTitle(Presentation presentation, string slideId)
+        {
+            // Find the slide with the specified slideId
+            var slide = presentation.Slides.FirstOrDefault(s => s.ObjectId == slideId);
+
+            if (slide != null)
+            {
+                // Find the page element of type 'TITLE'
+                var titleElement = slide.PageElements.FirstOrDefault(element => element.Shape?.Text != null && element.Shape.Text.TextElements?.FirstOrDefault(x=>x.TextRun?.Content != null)?.TextRun?.Content != null);
+
+                if (titleElement != null)
+                {
+                    // Return the title of the slide
+                    return titleElement.Shape.Text.TextElements.FirstOrDefault(x => x.TextRun?.Content != null)?.TextRun?.Content.Replace("\n", ""); ;
+                }
+            }
+
+            // Slide or title not found
+            return null;
+        }
+
+
+
 
         private string RemoveMetadataText(string input)
         {
@@ -491,13 +954,102 @@ namespace GoogleSlides.Api.Controllers
                 chartSpec.Title = chartInfo.Title;
                 chartSpec.Subtitle = chartInfo.Subtitle;
 
-                chartSpec.BasicChart = new BasicChartSpec();
-                chartSpec.BasicChart.ChartType = chartInfo.Type;
-                chartSpec.BasicChart.HeaderCount = 1;
-                chartSpec.BasicChart.LegendPosition = chartInfo.LegendPosition;
+                if (chartInfo.Type == "PIE" || chartInfo.Type == "DOUGHNUT")
+                {
+                    chartSpec.PieChart = new PieChartSpec();
+                    chartSpec.PieChart.ThreeDimensional = false;
+                    chartSpec.PieChart.PieHole = chartInfo.Type == "PIE" ? 0 : 0.5;
 
-                //Adding axis
-                chartSpec.BasicChart.Axis = new List<BasicChartAxis>()
+                    chartSpec.PieChart.Domain = new ChartData()
+                    {
+                        SourceRange = new ChartSourceRange()
+                        {
+                            Sources = new List<GridRange>()
+                            {
+                                new GridRange()
+                                {
+                                    EndColumnIndex = 1 ,
+                                    EndRowIndex = int.MaxValue,
+                                    StartColumnIndex = 0,
+                                    StartRowIndex = 0
+                                }
+                            }
+                        },
+
+                    };
+
+                    chartSpec.PieChart.Series = new ChartData()
+                    {
+                        SourceRange = new ChartSourceRange()
+                        {
+                            Sources = new List<GridRange>()
+                            {
+                                new GridRange()
+                                {
+                                    EndColumnIndex = 2,
+                                    EndRowIndex = int.MaxValue,
+
+                                    StartColumnIndex = 1,
+                                    StartRowIndex = 0
+                                }
+                            }
+                        }
+                    };
+
+                    //Column A
+                    var columnData = new List<IList<object>>();
+
+                    var domain = chartInfo.Domains.ElementAt(0);
+
+                    columnData.Add(new List<object>() { domain.Key });
+
+                    foreach (var dataCell in domain.Value)
+                    {
+                        columnData.Add(new List<object>() { dataCell });
+                    }
+
+                    var dataRange = new ValueRange()
+                    {
+                        Range = $"A:A",
+                        Values = columnData
+                    };
+
+                    valueRanges.Add(dataRange);
+
+                    //Column B
+                    var seriesColumnData = new List<IList<object>>();
+
+                    var serie = chartInfo.Series.ElementAt(0);
+
+                    seriesColumnData.Add(new List<object>() { serie.Key });
+
+                    foreach (var dataCell in serie.Value)
+                    {
+                        seriesColumnData.Add(new List<object>() { dataCell });
+                    }
+
+                    var seriesDataRange = new ValueRange()
+                    {
+                        Range = $"B:B",
+                        Values = seriesColumnData
+                    };
+
+                    valueRanges.Add(seriesDataRange);
+
+                }
+                else
+                {
+
+
+
+                    chartSpec.BasicChart = new BasicChartSpec();
+                    chartSpec.BasicChart.ChartType = chartInfo.Type;
+                    chartSpec.BasicChart.StackedType = chartInfo.StackedType;
+                    chartSpec.BasicChart.HeaderCount = 1;
+                    chartSpec.BasicChart.LegendPosition = chartInfo.LegendPosition;
+
+                    //Adding axis
+                    chartSpec.BasicChart.Axis = new List<BasicChartAxis>()
                 {
                     new BasicChartAxis()
                     {
@@ -512,19 +1064,19 @@ namespace GoogleSlides.Api.Controllers
                 };
 
 
-                //Adding domains
-                chartSpec.BasicChart.Domains = new List<BasicChartDomain>();
-                for (int i = 0; i < chartInfo.Domains.Count; i++)
-                {
-                    var domain = chartInfo.Domains.ElementAt(i);
-
-                    chartSpec.BasicChart.Domains.Add(new BasicChartDomain()
+                    //Adding domains
+                    chartSpec.BasicChart.Domains = new List<BasicChartDomain>();
+                    for (int i = 0; i < chartInfo.Domains.Count; i++)
                     {
-                        Domain = new ChartData()
+                        var domain = chartInfo.Domains.ElementAt(i);
+
+                        chartSpec.BasicChart.Domains.Add(new BasicChartDomain()
                         {
-                            SourceRange = new ChartSourceRange()
+                            Domain = new ChartData()
                             {
-                                Sources = new List<GridRange>()
+                                SourceRange = new ChartSourceRange()
+                                {
+                                    Sources = new List<GridRange>()
                                 {
                                     new GridRange()
                                     {
@@ -534,47 +1086,47 @@ namespace GoogleSlides.Api.Controllers
                                         StartRowIndex = 0
                                     }
                                 }
+                                }
                             }
+                        });
+
+
+                        var columnData = new List<IList<object>>();
+
+                        //add header of column
+                        columnData.Add(new List<object>() { domain.Key });
+
+                        foreach (var dataCell in domain.Value)
+                        {
+                            columnData.Add(new List<object>() { dataCell });
                         }
-                    });
 
+                        var columnLetter = GetColumnLetter(i);
 
-                    var columnData = new List<IList<object>>();
+                        // Add the new data to the spreadsheet
+                        var dataRange = new ValueRange()
+                        {
+                            Range = $"{columnLetter}:{columnLetter}",
+                            Values = columnData
+                        };
 
-                    //add header of column
-                    columnData.Add(new List<object>() { domain.Key });
+                        valueRanges.Add(dataRange);
 
-                    foreach (var dataCell in domain.Value)
-                    {
-                        columnData.Add(new List<object>() { dataCell });
                     }
 
-                    var columnLetter = GetColumnLetter(i);
-
-                    // Add the new data to the spreadsheet
-                    var dataRange = new ValueRange()
+                    //Adding series
+                    chartSpec.BasicChart.Series = new List<BasicChartSeries>();
+                    for (int i = 0; i < chartInfo.Series.Count; i++)
                     {
-                        Range = $"{columnLetter}:{columnLetter}",
-                        Values = columnData
-                    };
+                        var serie = chartInfo.Series.ElementAt(i);
 
-                    valueRanges.Add(dataRange);
-
-                }
-
-                //Adding series
-                chartSpec.BasicChart.Series = new List<BasicChartSeries>();
-                for (int i = 0; i < chartInfo.Series.Count; i++)
-                {
-                    var serie = chartInfo.Series.ElementAt(i);
-
-                    chartSpec.BasicChart.Series.Add(new BasicChartSeries()
-                    {
-                        Series = new ChartData()
+                        chartSpec.BasicChart.Series.Add(new BasicChartSeries()
                         {
-                            SourceRange = new ChartSourceRange()
+                            Series = new ChartData()
                             {
-                                Sources = new List<GridRange>()
+                                SourceRange = new ChartSourceRange()
+                                {
+                                    Sources = new List<GridRange>()
                                 {
                                     new GridRange()
                                     {
@@ -585,32 +1137,34 @@ namespace GoogleSlides.Api.Controllers
                                         StartRowIndex = 0
                                     }
                                 }
+                                }
                             }
+                        });
+
+                        var columnData = new List<IList<object>>();
+
+                        //add header of column
+                        columnData.Add(new List<object>() { serie.Key });
+
+                        foreach (var dataCell in serie.Value)
+                        {
+                            columnData.Add(new List<object>() { dataCell });
                         }
-                    });
 
-                    var columnData = new List<IList<object>>();
+                        var columnLetter = GetColumnLetter(i + chartInfo.Domains.Count);
 
-                    //add header of column
-                    columnData.Add(new List<object>() { serie.Key });
+                        // Add the new data to the spreadsheet
+                        var dataRange = new ValueRange()
+                        {
+                            Range = $"{columnLetter}:{columnLetter}",
+                            Values = columnData
+                        };
 
-                    foreach (var dataCell in serie.Value)
-                    {
-                        columnData.Add(new List<object>() { dataCell });
+                        valueRanges.Add(dataRange);
+
                     }
-
-                    var columnLetter = GetColumnLetter(i + chartInfo.Domains.Count);
-
-                    // Add the new data to the spreadsheet
-                    var dataRange = new ValueRange()
-                    {
-                        Range = $"{columnLetter}:{columnLetter}",
-                        Values = columnData
-                    };
-
-                    valueRanges.Add(dataRange);
-
                 }
+
 
                 //Update the values
                 _SheetsService.Spreadsheets.Values.BatchUpdate(new BatchUpdateValuesRequest()
@@ -632,7 +1186,7 @@ namespace GoogleSlides.Api.Controllers
                                 OffsetXPixels = 50,
                                 OffsetYPixels = 50,
                                 WidthPixels = 500,
-                                HeightPixels = 300,
+                                HeightPixels = 350,
                                 //AnchorCell = new GridCoordinate() { SheetId = 843514080 }
                             }
                         }
@@ -686,23 +1240,69 @@ namespace GoogleSlides.Api.Controllers
             return columnLetter;
         }
 
-        private List<Request> GetRemoveSlidesRequest(int[] slidesToRemove, Presentation slidesPresentation)
+        private List<Request> GetRemoveSlidesRequest(string[] slidesToRemoveIds, Presentation slidesPresentation)
         {
             var request = new List<Request>();
 
-            foreach (var slideToRemoveindex in slidesToRemove)
+            foreach (var slideToRemoveId in slidesToRemoveIds)
             {
                 request.Add(new Request()
                 {
                     DeleteObject = new DeleteObjectRequest()
                     {
-                        ObjectId = slidesPresentation.Slides[slideToRemoveindex].ObjectId
+                        ObjectId = slideToRemoveId
                     }
                 });
             }
 
             return request;
         }
+
+        private async Task AddImageSlide(string presentationId, string imageUrl, string newSlideId)
+        {
+            //string presentationId = "1aWCcKOeWR6EvTB2ldZThn4fZVObbuoHoWfteISWPqxc";
+            //string imageUrl = "https://googleslidesapi.azurewebsites.net/thumbnails/1yJzb5prVVdWZ4WAfKK6y0tOZ_pn0U8rR8KZ3UGvonfg/LARGE/slide0.png";
+
+
+            var getRequest = _SlidesService.Presentations.Get(presentationId);
+            var presentation = getRequest.Execute();
+
+            var createSlideRequest = new CreateSlideRequest
+            {
+                ObjectId = newSlideId
+                //InsertionIndex = presentation.Slides.Count,
+                //SlideLayoutReference = new LayoutReference { PredefinedLayout = "BLANK" }
+            };
+            var createSlideResponse = await _SlidesService.Presentations.BatchUpdate(new BatchUpdatePresentationRequest
+            {
+                Requests = new List<Request> { new Request { CreateSlide = createSlideRequest } }
+            }, presentationId).ExecuteAsync();
+
+            var pageId = createSlideResponse.Replies[0].CreateSlide.ObjectId;
+
+            await _SlidesService.Presentations.BatchUpdate(new BatchUpdatePresentationRequest
+            {
+                Requests = new List<Request> {
+                    new Request {
+                        CreateImage = new CreateImageRequest {
+                            Url = imageUrl,
+                            ElementProperties = new PageElementProperties()
+                            {
+                                PageObjectId = pageId,
+                                Transform = new AffineTransform { ScaleX = 1, ScaleY = 1, TranslateX = 0, TranslateY = 0, Unit = "PT" },
+                                Size = new Size
+                                {
+                                    Height = new Dimension { Magnitude = 405.04, Unit = "PT" },
+                                    Width = new Dimension { Magnitude = 719.42, Unit = "PT" }
+                                },
+                            }
+                        }
+                    }
+                }
+            }, presentationId).ExecuteAsync();
+
+        }
+
 
         private List<Request> GetTextPlaceholdersRequests(IDictionary<string, string> textPlaceholders)
         {
